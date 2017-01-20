@@ -1,7 +1,7 @@
 val commonSettings = Defaults.coreDefaultSettings ++ Seq(
   organization := "io.chymyst",
   version := "0.0.1",
-  scalaVersion := "2.11.8",
+  scalaVersion in ThisBuild := "2.11.8",
   crossScalaVersions := Seq("2.11.5", "2.11.6", "2.11.7", "2.11.8", "2.11.9", "2.12.0", "2.12.1"),
   resolvers ++= Seq(
     Resolver.sonatypeRepo("snapshots"),
@@ -52,7 +52,7 @@ lazy val warningsForWartRemover = Seq() //Seq(Wart.Any, Wart.AsInstanceOf, Wart.
 
 val rootProject = Some(chymyst)
 
-lazy val chymyst = (project in file("chymyst"))
+lazy val chymyst = (project in file("."))
   .settings(commonSettings: _*)
   .settings(
     name := "chymyst",
