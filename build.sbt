@@ -57,6 +57,7 @@ lazy val chymyst = (project in file("."))
   .settings(
     name := "chymyst",
     libraryDependencies ++= Seq(
+      "io.chymyst" %% "core" % "latest.integration",
       "org.scalatest" %% "scalatest" % "3.0.0" % "test"
     )
   )
