@@ -1,9 +1,14 @@
-package code.chymyst
+package io.chymyst
 
-import jc._
+import io.chymyst.jc.{M, Pool, defaultReactionPool, go, site}
+import io.chymyst.jc.{AllMatchersAreTrivial, Reaction, ReactionInfo, InputMoleculeInfo} // Let's make imports explicit, for reference.
+
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-object Chymyst {
+/**
+  * Created by user on 1/26/17.
+  */
+package object lab {
   /** Create a non-blocking molecule that, when emitted, will resolve the future.
     * Example usage: val (m, fut) = moleculeFuture[String](pool)
     *

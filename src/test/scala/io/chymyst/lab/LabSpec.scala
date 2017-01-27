@@ -1,18 +1,18 @@
-package code.chymyst
+package io.chymyst.lab
 
-import code.chymyst.jc._
-import code.chymyst.Chymyst._
-import code.chymyst.jc.Core.emptyReactionInfo
+import io.chymyst.jc.Core.emptyReactionInfo
+import io.chymyst.jc._
+
 import org.scalactic.source.Position
 import org.scalatest.concurrent.TimeLimitedTests
-import org.scalatest.concurrent.Waiters.{PatienceConfig, Waiter}
 import org.scalatest.time.{Millis, Span}
 import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.concurrent.Waiters.{PatienceConfig, Waiter}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class ChymystSpec extends FlatSpec with Matchers with TimeLimitedTests {
+class LabSpec extends FlatSpec with Matchers with TimeLimitedTests {
 
   val timeLimit = Span(2000, Millis)
 
@@ -34,7 +34,9 @@ class ChymystSpec extends FlatSpec with Matchers with TimeLimitedTests {
       go { case c(_) + f(_, r) => r() }
     )
 
-    Future { Thread.sleep(50) } & c    // insert a molecule from the end of the future
+    Future {
+      Thread.sleep(50)
+    } & c // insert a molecule from the end of the future
 
     f() shouldEqual (())
     tp.shutdownNow()
@@ -47,10 +49,15 @@ class ChymystSpec extends FlatSpec with Matchers with TimeLimitedTests {
     val tp = new FixedPool(2)
 
     site(tp)(
-      go { case c(x) => waiter { x shouldEqual "send it off"; () }; waiter.dismiss() }
+      go { case c(x) => waiter {
+        x shouldEqual "send it off"; ()
+      }; waiter.dismiss()
+      }
     )
 
-    Future { Thread.sleep(50) } + c("send it off")    // insert a molecule from the end of the future
+    Future {
+      Thread.sleep(50)
+    } + c("send it off") // insert a molecule from the end of the future
 
     waiter.await()(patienceConfig, implicitly[Position])
 
@@ -108,7 +115,8 @@ class ChymystSpec extends FlatSpec with Matchers with TimeLimitedTests {
       s <- fut
     } yield {
       waiter {
-        s shouldEqual "send it off"; ()
+        s shouldEqual "send it off"
+        ()
       }
       waiter.dismiss()
     }
@@ -133,7 +141,7 @@ class ChymystSpec extends FlatSpec with Matchers with TimeLimitedTests {
 
     tp.runClosure({
       val threadInfoOptOpt: Option[Option[ReactionInfo]] = Thread.currentThread match {
-        case t : ThreadWithInfo => Some(t.reactionInfo)
+        case t: ThreadWithInfo => Some(t.reactionInfo)
         case _ => None
       }
       waiter {
@@ -175,7 +183,7 @@ class ChymystSpec extends FlatSpec with Matchers with TimeLimitedTests {
     }.get
     println(res)
     res should matchPattern {
-      case Some(ReactionInfo(Array(InputMoleculeInfo(_, _, Wildcard, _), InputMoleculeInfo(_, _, Wildcard, _)), Array(), AllMatchersAreTrivial, _)) =>
+      case Some(ReactionInfo(Array(InputMoleculeInfo(_, _, WildcardInput, _), InputMoleculeInfo(_, _, WildcardInput, _)), Array(), Array(), AllMatchersAreTrivial, _)) =>
     }
   }
 
