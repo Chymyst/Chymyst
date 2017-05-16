@@ -1,8 +1,8 @@
 val commonSettings = Defaults.coreDefaultSettings ++ Seq(
   organization := "io.chymyst",
   version := "0.0.1",
-  scalaVersion in ThisBuild := "2.11.8",
-  crossScalaVersions := Seq("2.11.5", "2.11.6", "2.11.7", "2.11.8", "2.11.9", "2.12.0", "2.12.1"),
+  scalaVersion in ThisBuild := "2.12.2",
+  crossScalaVersions := Seq("2.11.11", "2.12.2"),
   resolvers ++= Seq(
     Resolver.sonatypeRepo("snapshots"),
     Resolver.sonatypeRepo("releases"),
@@ -44,20 +44,26 @@ val commonSettings = Defaults.coreDefaultSettings ++ Seq(
     )
 )
 
-tutSettings
+lazy val disableWarningsForTut = Set("-Ywarn-unused", "-Xlint")
+
+enablePlugins(TutPlugin)
 
 lazy val errorsForWartRemover = Seq(Wart.EitherProjectionPartial, Wart.Enumeration, Wart.Equals, Wart.ExplicitImplicitTypes, Wart.FinalCaseClass, Wart.FinalVal, Wart.LeakingSealed, Wart.Return, Wart.StringPlusAny, Wart.TraversableOps, Wart.TryPartial)
 
-lazy val warningsForWartRemover = Seq() //Seq(Wart.Any, Wart.AsInstanceOf, Wart.ImplicitConversion, Wart.IsInstanceOf, Wart.JavaConversions, Wart.Option2Iterable, Wart.OptionPartial, Wart.NoNeedForMonad, Wart.Nothing, Wart.Product, Wart.Serializable, Wart.ToString, Wart.While)
-
+lazy val warningsForWartRemover = Seq(Wart.JavaConversions, Wart.IsInstanceOf, Wart.OptionPartial) //Seq(Wart.Any, Wart.AsInstanceOf, Wart.ImplicitConversion, Wart.Option2Iterable, Wart.NoNeedForMonad, Wart.Nothing, Wart.Product, Wart.Serializable, Wart.ToString, Wart.While)
 val rootProject = Some(chymyst)
 
 lazy val chymyst = (project in file("."))
   .settings(commonSettings: _*)
   .settings(
-    name := "chymyst",
+    name := "chymyst-lab",
+    wartremoverWarnings in(Compile, compile) ++= warningsForWartRemover,
+    wartremoverErrors in(Compile, compile) ++= errorsForWartRemover,
+    tutSourceDirectory := (sourceDirectory in Compile).value / "tut",
+    tutTargetDirectory := baseDirectory.value / "docs",
+    scalacOptions in Tut := scalacOptions.value.filterNot(disableWarningsForTut.contains),
     libraryDependencies ++= Seq(
       "io.chymyst" %% "core" % "latest.integration",
-      "org.scalatest" %% "scalatest" % "3.0.0" % "test"
+      "org.scalatest" %% "scalatest" % "3.0.1" % Test
     )
   )
