@@ -1,6 +1,6 @@
 val commonSettings = Defaults.coreDefaultSettings ++ Seq(
   organization := "io.chymyst",
-  version := "0.0.1",
+  version := "0.0.2",
   scalaVersion in ThisBuild := "2.12.2",
   crossScalaVersions := Seq("2.11.11", "2.12.2"),
   resolvers ++= Seq(
@@ -8,6 +8,9 @@ val commonSettings = Defaults.coreDefaultSettings ++ Seq(
     Resolver.sonatypeRepo("releases"),
     "Typesafe releases" at "http://repo.typesafe.com/typesafe/releases"
   ),
+  licenses := Seq("Apache License, Version 2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.txt")),
+  homepage := Some(url("https://chymyst.github.io/chymyst-core/")),
+  description := "Declarative concurrency framework for Scala - the standard library implementing the concurrency patterns",
 
   scalacOptions ++= Seq(// https://tpolecat.github.io/2014/04/11/scalac-flags.html
     "-deprecation",
@@ -63,7 +66,27 @@ lazy val chymyst = (project in file("."))
     tutTargetDirectory := baseDirectory.value / "docs",
     scalacOptions in Tut := scalacOptions.value.filterNot(disableWarningsForTut.contains),
     libraryDependencies ++= Seq(
-      "io.chymyst" %% "core" % "latest.integration",
+      "io.chymyst" %% "chymyst-core" % "0.1.9",
       "org.scalatest" %% "scalatest" % "3.0.1" % Test
     )
   )
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+// Publishing to Sonatype Maven repository
+publishMavenStyle := true
+//
+// pomIncludeRepository := { _ => false } // not sure we need this.
+// http://www.scala-sbt.org/release/docs/Using-Sonatype.html says we might need it
+// because "sometimes we have optional dependencies for special features".
+//
+publishTo := {
+  val nexus = "https://oss.sonatype.org/"
+  if (isSnapshot.value)
+    Some("snapshots" at nexus + "content/repositories/snapshots")
+  else
+    Some("releases" at nexus + "service/local/staging/deploy/maven2")
+}
+//
+publishArtifact in Test := false
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////////

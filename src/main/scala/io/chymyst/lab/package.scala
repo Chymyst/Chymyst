@@ -52,7 +52,30 @@ package object lab {
     }(ec)
   }
 
-  def litmus[T](pool: Pool): (M[T], B[Unit, T]) = {
+  /** Implement a blocking wait until a reaction has run.
+    *
+    * This creates a pair of new emitters (one blocking, one non-blocking) and a reaction
+    * that allows users to fetch the value carried by the non-blocking molecule.
+    *
+    * Sample usage:
+    *
+    * {{{
+    *   val (carrier, fetch) = litmus[Int]
+    *   // emit carrier() from our reaction
+    *   site(go { case a(x) + c(y) ⇒
+    *     val z = x + y // some computation
+    *     carrier(z)
+    *   })
+    *   a(123) // emit some molecules
+    *   ...
+    *   val result = fetch() // block and wait for the reaction
+    * }}}
+    *
+    * @param pool A thread pool on which the reaction should run. The default reaction pool is used if this argument is not supplied.
+    * @tparam T Type of value carried by the non-blocking molecule and fetched by the blocking molecule.
+    * @return A pair of new emitters.
+    */
+  def litmus[T](pool: Pool = defaultReactionPool): (M[T], B[Unit, T]) = {
     val carrier = m[T]
     val fetch = b[Unit, T]
     site(pool)(
