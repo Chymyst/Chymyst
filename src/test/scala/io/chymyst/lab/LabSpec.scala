@@ -8,7 +8,7 @@ import org.scalatest.concurrent.TimeLimitedTests
 import org.scalatest.time.{Millis, Span}
 import org.scalatest.{FlatSpec, Matchers}
 import org.scalatest.concurrent.Waiters.{PatienceConfig, Waiter}
-
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -125,6 +125,21 @@ class LabSpec extends FlatSpec with Matchers with TimeLimitedTests {
     waiter.await()(patienceConfig, implicitly[Position])
 
     tp.shutdownNow()
+  }
+
+  behavior of "litmus"
+
+  it should "create two molecule emitters" in {
+    withPool(new FixedPool(4)) { tp ⇒
+      val (carrier, fetch) = litmus[Long](tp)
+      carrier.name shouldEqual "carrier"
+      fetch.name shouldEqual "fetch"
+
+      fetch.timeout()(1.seconds) shouldEqual None
+
+      carrier(123L)
+      fetch() shouldEqual 123L
+    }.get
   }
 
   behavior of "cleanup with resource"
