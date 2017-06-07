@@ -1,6 +1,6 @@
 package io.chymyst
 
-import io.chymyst.jc.{+, AllMatchersAreTrivial, B, InputMoleculeInfo, M, Pool, Reaction, ReactionInfo, b, defaultReactionPool, go, m, site}
+import io.chymyst.jc.{+, AllMatchersAreTrivial, B, InputMoleculeInfo, M, Pool, Reaction, ReactionInfo, b, defaultPool, go, m, site}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
@@ -13,7 +13,7 @@ package object lab {
     * @tparam T Type of value carried by the molecule and by the future.
     * @return Tuple consisting of new molecule emitter and the new future.
     */
-  def moleculeFuture[T](pool: Pool = defaultReactionPool): (M[T], Future[T]) = {
+  def moleculeFuture[T](pool: Pool = defaultPool): (M[T], Future[T]) = {
     val f = new M[T]("future")
     val p = Promise[T]()
 
@@ -75,7 +75,7 @@ package object lab {
     * @tparam T Type of value carried by the non-blocking molecule and fetched by the blocking molecule.
     * @return A pair of new emitters.
     */
-  def litmus[T](pool: Pool = defaultReactionPool): (M[T], B[Unit, T]) = {
+  def litmus[T](pool: Pool = defaultPool): (M[T], B[Unit, T]) = {
     val carrier = m[T]
     val fetch = b[Unit, T]
     site(pool)(

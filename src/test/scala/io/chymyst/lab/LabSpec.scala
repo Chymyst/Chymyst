@@ -1,6 +1,5 @@
 package io.chymyst.lab
 
-import io.chymyst.jc.Core.emptyReactionInfo
 import io.chymyst.jc._
 
 import org.scalactic.source.Position
@@ -9,7 +8,6 @@ import org.scalatest.time.{Millis, Span}
 import org.scalatest.{FlatSpec, Matchers}
 import org.scalatest.concurrent.Waiters.{PatienceConfig, Waiter}
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class LabSpec extends FlatSpec with Matchers with TimeLimitedTests {
@@ -29,7 +27,9 @@ class LabSpec extends FlatSpec with Matchers with TimeLimitedTests {
     val c = m[Unit]
     val f = b[Unit, Unit]
 
-    val tp = new FixedPool(2)
+    val tp = FixedPool(2)
+    implicit val _ = tp.executionContext
+    
     site(tp)(
       go { case c(_) + f(_, r) => r() }
     )
@@ -39,14 +39,14 @@ class LabSpec extends FlatSpec with Matchers with TimeLimitedTests {
     } & c // insert a molecule from the end of the future
 
     f() shouldEqual (())
-    tp.shutdownNow()
   }
 
   it should "emit a molecule from a future with a lazy emission" in {
     val waiter = new Waiter
 
     val c = new M[String]("c")
-    val tp = new FixedPool(2)
+    val tp = FixedPool(2)
+    implicit val _ = tp.executionContext
 
     site(tp)(
       go { case c(x) => waiter {
@@ -61,7 +61,6 @@ class LabSpec extends FlatSpec with Matchers with TimeLimitedTests {
 
     waiter.await()(patienceConfig, implicitly[Position])
 
-    tp.shutdownNow()
   }
 
   it should "not emit a molecule from a future prematurely" in {
@@ -73,7 +72,9 @@ class LabSpec extends FlatSpec with Matchers with TimeLimitedTests {
     val f = b[Unit, String]
     val f2 = b[Unit, String]
 
-    val tp = new FixedPool(4)
+    val tp = FixedPool(4)
+    implicit val _ = tp.executionContext
+
     site(tp)(
       go { case e(_) + c(_) => d() },
       go { case c(_) + f(_, r) => r("from c"); c() },
@@ -93,14 +94,14 @@ class LabSpec extends FlatSpec with Matchers with TimeLimitedTests {
     waiter.await()
     f2() shouldEqual "from d"
 
-    tp.shutdownNow()
   }
 
   behavior of "#moleculeFuture"
 
   it should "create a future that succeeds when molecule is emitted" in {
     val waiter = new Waiter
-    val tp = new FixedPool(4)
+    val tp = FixedPool(4)
+    implicit val _ = tp.executionContext
 
     val b = m[Unit]
 
@@ -124,13 +125,12 @@ class LabSpec extends FlatSpec with Matchers with TimeLimitedTests {
     b()
     waiter.await()(patienceConfig, implicitly[Position])
 
-    tp.shutdownNow()
   }
 
   behavior of "litmus"
 
   it should "create two molecule emitters" in {
-    withPool(new FixedPool(4)) { tp ⇒
+    withPool(FixedPool(4)) { tp ⇒
       val (carrier, fetch) = litmus[Long](tp)
       carrier.name shouldEqual "carrier"
       fetch.name shouldEqual "fetch"
@@ -147,59 +147,6 @@ class LabSpec extends FlatSpec with Matchers with TimeLimitedTests {
   it should "catch exceptions and not fail" in {
     val tryX = cleanup(1)(_ => throw new Exception("ignore this exception"))(_ => throw new Exception("foo"))
     tryX.isFailure shouldEqual true
-  }
-
-  behavior of "withPool"
-
-  def checkPool(tp: Pool): Unit = {
-    val waiter = new Waiter
-
-    tp.runClosure({
-      val threadInfoOptOpt: Option[Option[ReactionInfo]] = Thread.currentThread match {
-        case t: ThreadWithInfo => Some(t.reactionInfo)
-        case _ => None
-      }
-      waiter {
-        threadInfoOptOpt shouldEqual Some(Some(emptyReactionInfo))
-        ()
-      }
-      waiter.dismiss()
-
-    }, emptyReactionInfo)
-
-    waiter.await()(patienceConfig, implicitly[Position])
-  }
-
-  it should "run tasks on a thread with info, in fixed pool" in {
-    withPool(new FixedPool(2))(checkPool).get shouldEqual (())
-  }
-
-  it should "run tasks on a thread with info, in smart pool" in {
-    withPool(new SmartPool(2))(checkPool).get shouldEqual (())
-  }
-
-  it should "run reactions on a thread with reaction info" in {
-    val res = withPool(new FixedPool(2)) { tp =>
-      val a = m[Unit]
-      val result = b[Unit, Option[ReactionInfo]]
-
-      site(tp)(
-        go { case a(_) + result(_, r) =>
-          val reactionInfo = Thread.currentThread match {
-            case t: ThreadWithInfo => t.reactionInfo
-            case _ => None
-          }
-          r(reactionInfo)
-        }
-      )
-
-      a()
-      result()
-    }.get
-    println(res)
-    res should matchPattern {
-      case Some(ReactionInfo(Array(InputMoleculeInfo(_, _, WildcardInput, _), InputMoleculeInfo(_, _, WildcardInput, _)), Array(), Array(), AllMatchersAreTrivial, _)) =>
-    }
   }
 
 }
