@@ -20,7 +20,7 @@ class ChymystPresentation extends FlatSpec with Matchers {
   We will now attempt to _derive_ such a DSL by systematic reasoning from scratch.
   We will then test the use of this DSL as implemented by the `Chymyst` library.
 
-  Example 1: We would like to compute (1 + 2) + (3 + 4) in parallel.
+  Example 1: We would like to compute (1 + 2) * (3 + 4) in parallel.
    */
 
   it should "compute (1 + 2) * (3 + 4) in parallel" in {
