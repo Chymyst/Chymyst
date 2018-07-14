@@ -334,8 +334,9 @@ class ChymystPresentation extends FlatSpec with Matchers {
     val read = new M[Unit]("read max_cos")
 
     We can now declare a concurrent function that has access to max_cos's value.
+    The function will print the value and emit it again, unchanged.
 
-    val read_max = go { case max_cos(c) + read(_) ⇒ println(c) }
+    val read_max = go { case max_cos(c) + read(_) ⇒ println(c); max_cos(c) }
 
     Rather than do a `println(c)` here, let us implement a more useful test.
     Let us create an interface between the new concurrent DSL and Scala `Future`s.
@@ -344,7 +345,7 @@ class ChymystPresentation extends FlatSpec with Matchers {
     The `Promise` value will be passed as concurrent data with the `read` label:
      */
     val read = new M[Promise[Double]]("read max_cos")
-    val read_max = go { case max_cos(c) + read(p) ⇒ p.success(c) }
+    val read_max = go { case max_cos(c) + read(p) ⇒ p.success(c); max_cos(c) }
     /*
     Now we can emit read() with a fresh `Promise` value, and wait for the result.
 
