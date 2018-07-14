@@ -41,12 +41,12 @@ package object lab {
     /** Modify the future: when it succeeds, it will additionally emit a given molecule.
       * The molecule will carry the specified value (the result value of the future is unchanged).
       *
-      * Example usage: Future { ... } + a(123)
+      * Example usage: Future { ... } & a(123)
       *
       * @param u Molecule emission expression, such as a(123)
       * @return The modified future.
       */
-    def +(u: => Unit): Future[T] = f.map { x =>
+    def &(u: => Unit): Future[T] = f.map { x =>
       u
       x
     }(ec)

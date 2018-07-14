@@ -9,6 +9,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import org.scalatest.concurrent.Waiters.{PatienceConfig, Waiter}
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.Future
+import scala.language.implicitConversions
 
 class LabSpec extends FlatSpec with Matchers with TimeLimitedTests {
 
@@ -28,7 +29,7 @@ class LabSpec extends FlatSpec with Matchers with TimeLimitedTests {
     val f = b[Unit, Unit]
 
     val tp = FixedPool(2)
-    implicit val _ = tp.executionContext
+    implicit val ec = tp.executionContext
     
     site(tp)(
       go { case c(_) + f(_, r) => r() }
@@ -57,7 +58,7 @@ class LabSpec extends FlatSpec with Matchers with TimeLimitedTests {
 
     Future {
       Thread.sleep(50)
-    } + c("send it off") // insert a molecule from the end of the future
+    } & c("send it off") // insert a molecule from the end of the future
 
     waiter.await()(patienceConfig, implicitly[Position])
 
@@ -87,7 +88,7 @@ class LabSpec extends FlatSpec with Matchers with TimeLimitedTests {
       Thread.sleep(20)
     } // waiter has 150 ms timeout
 
-    (givenFuture + e()).map { _ => waiter.dismiss() }
+    (givenFuture & e()).map { _ => waiter.dismiss() }
     // The test would fail if e() were emitted right away at this point.
 
     f() shouldEqual "from c"
