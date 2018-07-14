@@ -405,9 +405,9 @@ class ChymystPresentation extends FlatSpec with Matchers {
   for a large number of concurrency algorithms I have examined.
 
   Programming in the chemical machine is "systematic" because there are very few
-  primitives and very few ways for the programmer to control the concurrent
+  primitives and very few choices for the programmer to control the concurrent
   computation. Usually, there is only one way of solving a given concurrency
-  problem, and one can arrive at the solution by logical reasoning, as I
+  problem, and one can quickly arrive at the solution by logical reasoning, as I
   illustrated by the examples in this tutorial.
 
   The chemical machine itself can be embedded as a library-based DSL in many
