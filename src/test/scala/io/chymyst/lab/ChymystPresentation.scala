@@ -9,13 +9,13 @@ import scala.concurrent.duration.Duration
 
 class ChymystPresentation extends FlatSpec with Matchers {
 
-  behavior of "concurrent computations"
+  behavior of "A fully declarative DSL for concurrent computations"
 
   /*
 
   What would be a good DSL for expressing concurrent and parallel computations
   in a natural and declarative manner? Can we just say something like "this
-  computation needs to be concurrent" and achieve safe parallel code?
+  computation needs to be concurrent" and achieve safe, automatically parallel code?
 
   We will now attempt to _derive_ such a DSL by systematic reasoning from scratch.
   We will then test the use of this DSL as implemented by the `Chymyst` library.
