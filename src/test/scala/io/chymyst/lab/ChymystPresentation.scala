@@ -29,7 +29,7 @@ class ChymystPresentation extends FlatSpec with Matchers {
 
     def times(inp: (Int, Int)): Int = inp._1 * inp._2
 
-    // We want to run `plus(1, 2)` and `plus(3, 4)` in parallel,
+    // We want to run `plus((1, 2))` and `plus((3, 4))` in parallel,
     // wait for the results, then apply `times()` to the two result values.
 
     // Here we just declare the input data to "be concurrent".
@@ -56,7 +56,7 @@ class ChymystPresentation extends FlatSpec with Matchers {
 
   Declaring a data item to be concurrent was done using Scala's `Future`.
 
-  However, a `Future`-valued expression can express only a limited subclass of
+  However, a `Future`-valued expression can implement only a limited subclass of
   concurrent computations.
 
   For example, with a for/yield block on a `Future` we cannot:
@@ -68,16 +68,16 @@ class ChymystPresentation extends FlatSpec with Matchers {
 
   Instead of adding _ad hoc_ "features" to `Future`, let us find better primitives.
 
-  How to start a new process concurrently when a new data item "arrives"?
+  How to start a new process concurrently whenever a new data item "arrives"?
 
   We need to say that a new concurrent value "became available" for computations.
 
   It would be good if we could declare a function to "be concurrent", so that
-  it will get evaluated automatically whenever its input values become available.
+  it will get evaluated automatically whenever its input values "become available".
 
   For example, we would like to define the function `plus()` to "be concurrent",
   and then we want `plus((1, 2))` to run automatically whenever the tuple `(1, 2)`
-  "becomes available".
+  "becomes available" as concurrent data.
 
   When `plus((1, 2))` completes, we would naturally expect that its result, `3`,
   will also "become available" in the same sense for any further computations.
@@ -111,7 +111,7 @@ class ChymystPresentation extends FlatSpec with Matchers {
   How can we specify that the tuple (1, 2) is intended as input for `plus`?
   We do not want to write `plus((1, 2))` and `plus((3, 4))` explicitly:
   We already declared `plus()` as a concurrent function, and that should be enough.
-  So now `plus` should somehow find and consume its input data automatically.
+  So now `plus()` should somehow find and consume its input data automatically.
 
   It is clear that we have to _label_ the concurrent data in some way, in order
   to express the connection between concurrent data and the declared functions.
@@ -194,7 +194,7 @@ class ChymystPresentation extends FlatSpec with Matchers {
   - To define labels, we use the constructor of the class `M`:
   */
   val inp1 = new M[Int]("input 1") // Names for debugging purposes only.
-  val inp2 = new M[Int]("input 2")
+  val inp2 = new M[Int]("input 2") // Shorter: val inp2 = m[Int]
   /*
   - To emit concurrent data, write simply `inp1(7)` instead of `emit("inp1", 7)`.
   This is implemented via `M#apply()` in the `Chymyst` library.
@@ -262,7 +262,7 @@ class ChymystPresentation extends FlatSpec with Matchers {
   and needs to be run in parallel on each input data item.
   */
   it should "run example 2" in {
-    val x_in = new M[Double]("x_i input")
+    val x_in = m[Double]
 
     /* We want to define the computation now, but how?
 
@@ -270,7 +270,7 @@ class ChymystPresentation extends FlatSpec with Matchers {
 
     The result of the computation needs to be emitted with a label. What label?
     */
-    val x_out = new M[Double]("cos output")
+    val x_out = m[Double] // Same as `new M[Double]("x_out")`.
     val do_cos = go { case x_in(x) ⇒ x_out(math.cos(x)) }
     /*
     As the `x_in` items arrive, we will consume them and emit `x_out` items.
@@ -331,7 +331,7 @@ class ChymystPresentation extends FlatSpec with Matchers {
     anything is to emit an item of concurrent data. Therefore, we need to define
     another label, say `read`, that will be an additional input of the function.
 
-    val read = new M[Unit]("read max_cos")
+    val read = m[Unit]
 
     We can now declare a concurrent function that has access to max_cos's value.
     The function will print the value and emit it again, unchanged.
@@ -344,7 +344,7 @@ class ChymystPresentation extends FlatSpec with Matchers {
     We can create a fresh Scala `Promise` and resolve it inside the function body.
     The `Promise` value will be passed as concurrent data with the `read` label:
      */
-    val read = new M[Promise[Double]]("read max_cos")
+    val read = m[Promise[Double]]
     val read_max = go { case max_cos(c) + read(p) ⇒ p.success(c); max_cos(c) }
     /*
     Now we can emit read() with a fresh `Promise` value, and wait for the result.
@@ -352,8 +352,10 @@ class ChymystPresentation extends FlatSpec with Matchers {
     Before testing this code, we need to activate the "concurrent site".
     The site will hold all concurrent data used as input for any concurrent
     functions we defined.
-     */
+    */
+
     site(do_cos, update_max, read_max)
+
     // We can begin the test now.
     // Emit a concurrent value -1.0 with label `max_cos`.
     max_cos(-1.0) // Should be safe, since `math.cos()` is never below -1.
