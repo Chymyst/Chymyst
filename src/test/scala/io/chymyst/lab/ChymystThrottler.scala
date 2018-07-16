@@ -104,8 +104,8 @@ class ChymystThrottler extends FlatSpec with Matchers {
       val new_timestamp = System.currentTimeMillis()
       println(s"$message Time interval: ${new_timestamp - t}")
       timestamp(new_timestamp)
-    })
-    timestamp(0)
+    },
+      go { case _ ⇒ timestamp(0) })
     s
   }
 
@@ -125,6 +125,7 @@ class ChymystThrottler extends FlatSpec with Matchers {
 
     and so on. */
   }
+
   it should "run a reaction with 200 ms throttling" in {
     val s = print_elapsed("Throttled.")
     val interval = 200L
