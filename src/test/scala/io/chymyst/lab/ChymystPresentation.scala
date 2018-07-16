@@ -202,7 +202,7 @@ class ChymystPresentation extends FlatSpec with Matchers {
   - To define concurrent functions, we use the `go()` method and a special syntax,
   as defined by the `Chymyst` library.
 
-  Instead of `def_concur times(inp1: Int, inp2: Int) = println(x * y)`, write:
+  Instead of `def_concur times(inp1: Int, inp2: Int) = println(inp1 * inp2)`, write:
   */
   val times = go { case inp1(x) + inp2(y) ⇒ println(x * y) }
   /*
