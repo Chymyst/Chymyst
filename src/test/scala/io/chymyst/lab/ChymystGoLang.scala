@@ -67,13 +67,13 @@ Running 9.
     def make_chan1[A](n: Int): GoChan1[A] = {
       val send = b[A, Unit]
       val receive = b[Unit, A]
-      val ready = m[Unit]
-      val buffer = m[A]
+      val available = m[Unit]
+      val buffer1 = m[A]
       site(
-        go { case send(x, sent) + ready(_) ⇒ buffer(x); sent() },
-        go { case receive(_, received) + buffer(x) ⇒ ready(); received(x) }
+        go { case send(x, sent) + available(_) ⇒ buffer1(x); sent() },
+        go { case receive(_, received) + buffer1(x) ⇒ available(); received(x) }
       )
-      (1 to n).foreach(_ ⇒ ready()) // This works for any n > 0.
+      (1 to n).foreach(_ ⇒ available()) // This works for any n > 0.
       GoChan1(send, receive)
     }
 
@@ -265,11 +265,11 @@ ping, 4
     Required functionality:
     - A chosen player (either `ping` or `pong`) starts the game.
     - Moves are counted and messages are printed as before.
-    - A blocking signal `stop` will stop the game.
+    - A blocking signal `stop()` will stop the game.
      */
     val ball = m[Int] // The current counter value.
-    val stop = b[Unit, Int] // Return the number of moves played.
     val side = m[String] // The current player's name.
+    val stop = b[Unit, Int] // Return the number of moves played.
 
     site(
       go { case ball(n) + side(name) ⇒ play(name, n + 1) },
