@@ -12,6 +12,7 @@ class ChymystGoLang extends FlatSpec with Matchers {
   that function on a molecule.
    */
   val go_routine_emit = m[() ⇒ Unit]
+
   site(go { case go_routine_emit(f) ⇒ f() })
 
   // A helper method prepares a function of type `() ⇒ Unit` and emits it.
