@@ -60,7 +60,7 @@ class ChymystPubSub extends FlatSpec with Matchers {
     val stop = b[Unit, Unit]
     site(
       go { case data(x :: tail) ⇒ pub(x); Thread.sleep(delay_ms); data(tail) },
-      go { case stop(_, r) + data(_) ⇒ r() } // Once stopped, can't be started again.
+      go { case stop(_, r) + data(_) ⇒ r() } // Once stopped, can't resume.
     )
     Publisher(data, stop, pub)
   }
@@ -86,12 +86,12 @@ class ChymystPubSub extends FlatSpec with Matchers {
 
   it should "run publisher, consumer, subscribe, and unsubscribe" in {
     val pub = m[Int]
-    val publisher = make_pub(pub, 100)
     val office = make_office(pub)
+    val publisher = make_pub(pub, 100)
     // Some subscribers.
     val s1 = m[Int]
     val s2 = m[Int]
-    // Attach some consumers to these subscribers.
+    // Attach some consumer functions to these subscribers.
     attach(s1)(x ⇒ println(s"s1 got $x."))
     attach(s2)(x ⇒ println(s"s2 got $x."))
     // Start publishing.
