@@ -35,14 +35,14 @@ class ChymystPubSub extends FlatSpec with Matchers {
   We would like to create such programs from composable building blocks:
   
   - A type representing a "publisher".
-  - A function to "subscribe" and "unsubscribe".
+  - Functions to "subscribe" and "unsubscribe".
   
   A simple Pub/Sub API can look like this:
   
   - Create a "publisher" from a sequence of values.
   - Start running a "publisher"; stop it.
   - Attach a "consumer" to a publisher, executing a side effect for each value.
-  - Create a new publisher by subscribing to an existing publisher, modifying its values.
+  - Create a new publisher by subscribing to an existing publisher.
   - Unsubscribe a publisher from its parent publisher. 
 
   A typical pattern for encapsulating concurrent logic in the chemical machine:
