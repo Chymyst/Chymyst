@@ -74,14 +74,16 @@ class ChymystDinPhil extends FlatSpec with Matchers {
       val indices = 0 until n
       val ts = indices.map { i ⇒ new M[Unit](s"t$n") }
       val hs = indices.map { i ⇒ new M[Unit](s"h$n") }
-      // `fs` is the sequence of forks to the left of philosophers.
+      // `fs_left` is the sequence of forks to the left of philosophers.
       // E.g. (fork9:0, fork0:1, ..., fork8:9).
-      val fs = indices.map { i ⇒
+      val fs_left = indices.map { i ⇒
         val prev = (i + n - 1) % n
         new M[Unit](s"fork$prev:$i") // e.g. fork4:5 is the fork between 4 and 5.
       }
-      // Compute the sequence of forks to the right, for convenience:
-      val fs_right = fs.tail :+ fs.head // E.g. (fork0:1, ..., fork8:9, fork9:0).
+
+      // Compute the sequence of forks to the right, for convenience.
+      // E.g. (fork0:1, ..., fork8:9, fork9:0).
+      def fs_right(i: Int) = fs_left((i + 1) % n)
 
       // Create reactions for thinking.
       // E.g. go { case t4(_) ⇒ wait("Philosopher 4 is thinking");  h4() }
@@ -97,19 +99,19 @@ class ChymystDinPhil extends FlatSpec with Matchers {
       val eating_reactions = indices.map { i ⇒
         val t = ts(i)
         val h = hs(i)
-        val f_left = fs(i)
-        val f_right = fs_right(i)
-        go { case h(_) + f_left(_) + f_right(_) ⇒
-          wait(s"Philosopher $i is eating"); t() + f_left() + f_right()
+        val fa = fs_left(i)
+        val fb = fs_right(i)
+        go { case h(_) + fa(_) + fb(_) ⇒
+          wait(s"Philosopher $i is eating"); t() + fa() + fb()
         }
       }
 
       // Create a reaction site.
-      site(eating_reactions ++ thinking_reactions :_*)
+      site(eating_reactions ++ thinking_reactions: _*)
 
       // Emit the initial molecules.
       ts.foreach(_.apply())
-      fs.foreach(_.apply())
+      fs_left.foreach(_.apply())
 
     }
 
