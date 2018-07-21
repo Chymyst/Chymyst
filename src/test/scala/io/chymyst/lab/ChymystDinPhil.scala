@@ -40,7 +40,7 @@ class ChymystDinPhil extends FlatSpec with Matchers {
       go { case t4(_) ⇒ wait("Descartes is thinking"); h4() },
       go { case t5(_) ⇒ wait("Voltaire is thinking"); h5() },
 
-      // To the right of h1 is h12, to the left is fork51
+      // To the right of h1 is fork12, to the left is fork51.
       go { case h1(_) + fork12(_) + fork51(_) ⇒
         wait("Socrates is eating"); t1() + fork12() + fork51()
       },
@@ -112,10 +112,8 @@ class ChymystDinPhil extends FlatSpec with Matchers {
       // Emit the initial molecules.
       ts.foreach(_.apply())
       fs_left.foreach(_.apply())
-
     }
-
     run_philosophers(10)
-    Thread.sleep(400)
+    Thread.sleep(500)
   }
 }
