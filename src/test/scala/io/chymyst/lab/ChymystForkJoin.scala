@@ -109,7 +109,7 @@ class ChymystForkJoin extends FlatSpec with Matchers {
   ): A
    */
 
-  // Fibonacci numbers via fork-join.
+  // Fibonacci numbers via fork-join. fib(x) = f(x-1) + f(x-2).
 
   def fib_fork: Int ⇒ Either[Int, List[Int]] = { x ⇒
     if (x <= 2) Left(1) else Right(List(x - 1, x - 2))
@@ -163,9 +163,9 @@ class ChymystForkJoin extends FlatSpec with Matchers {
   First implementation: define local reaction sites.
   
   Derivation:
-  - The initial data `x` must be on a molecule, say `start`.
-  - The final result `r` must be on another molecule, say `report`.
-  - After we emit `start()`, eventually `report()` will be emitted.
+  - The initial data `x: A` must be on a molecule, say `start`.
+  - The final result `r: A` must be on another molecule, say `report`.
+  - After we emit `start(x)`, eventually `report(r)` will be emitted.
   - When a task is split into subtasks, each subtask again emits `start()`.
   - However, the subtasks should report their results separately from the main `report`.
   Therefore, there must be a different `report` molecule for each set of subtasks.
