@@ -3,6 +3,10 @@ package io.chymyst.lab
 import io.chymyst.jc._
 import org.scalatest.{FlatSpec, Matchers}
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
+
 class ChymystForkJoin extends FlatSpec with Matchers {
 
   behavior of "recursive fork-join"
@@ -38,12 +42,16 @@ class ChymystForkJoin extends FlatSpec with Matchers {
                          ^
                          |_________ Return this final result.
   
+  
+  
   The recursive fork-join pattern:
   
   - A task is either done sequentially (d) or forked into 2 sub-tasks (f).
   - Sub-tasks can be forked into sub-sub-tasks, etc., with no depth limit.
   - Results from sub-tasks are combined (c) into the result for the task.
   
+  (Example: parallel merge-sort.)
+    
   Computation looks like a tree:
   
      The initial task: _______    
@@ -71,28 +79,27 @@ class ChymystForkJoin extends FlatSpec with Matchers {
    */
 
   /*
-  Generic fork-join is described by the `FJTask[A]` type and two functions:
+  Generic fork-join is described by two functions:
   
-  def fork[A]: FJTask[A] ⇒ Either[A, List[FJTask[A]]]
+  def fork[A]: A ⇒ Either[A, List[A]]
   def join[A]: List[A] ⇒ A
   
-  Given these two functions for a particular FJTask, we need to run this in parallel.
+  Given these two functions for a particular task, we now need to run this in parallel.
   
-  def runFJ[FJTask[_], A](
-    fork: FJTask[A] ⇒ Either[A, List[FJTask[A]]],
+  def runFJ[A](
+    fork: A ⇒ Either[A, List[A]],
     join: List[A] ⇒ A,
-    fjTask: FJTask[A]
+    init_value: A
   ): A
    */
 
   // Fibonacci numbers via fork-join.
-  type FJTask[A] = A
 
-  def fib_fork: FJTask[Int] ⇒ Either[Int, List[FJTask[Int]]] = { x ⇒
+  def fib_fork: Int ⇒ Either[Int, List[Int]] = { x ⇒
     if (x <= 2) Left(1) else Right(List(x - 1, x - 2))
   }
 
-  def fib_join: List[Int] ⇒ Int = {
+  def fib_join: List[Int] ⇒ Int = { // List() will always have 2 elements.
     case List(x, y) ⇒ x + y
   }
 
@@ -100,29 +107,77 @@ class ChymystForkJoin extends FlatSpec with Matchers {
   Reference implementation: no parallelism.
    */
   it should "implement Fibonacci using fork-join sequentially" in {
-    def runFJ[FJT[_], A](
-      fork: FJT[A] ⇒ Either[A, List[FJT[A]]],
+    def runFJ[A](
+      fork: A ⇒ Either[A, List[A]],
       join: List[A] ⇒ A,
-      fjTask: FJT[A]
-    ): A = fork(fjTask) match {
+      init_value: A
+    ): A = fork(init_value) match {
       case Left(result) ⇒ result
-      case Right(substasks) ⇒ join(substasks.map(s ⇒ runFJ(fork, join, s)))
+      case Right(subtasks) ⇒ join(subtasks.map(s ⇒ runFJ(fork, join, s)))
     }
 
-    runFJ[FJTask, Int](fib_fork, fib_join, 8) shouldEqual 21
+    runFJ(fib_fork, fib_join, 8) shouldEqual 21
   }
 
   /*
-  Reference implementation: define local reaction sites.
+  Reference implementation: use Future.
    */
-  it should "implement Fibonacci using fork-n-join with local sites" in {
+  it should "implement Fibonacci using fork-join with Scala Futures" in {
+    def runFJ[A](
+      fork: A ⇒ Either[A, List[A]],
+      join: List[A] ⇒ A,
+      init_value: A
+    ): Future[A] = fork(init_value) match {
+      case Left(result) ⇒
+        Future.successful(result)
+      case Right(subtasks) ⇒
+        Future.sequence(subtasks.map(s ⇒ runFJ(fork, join, s))).map(join)
+    }
 
+    Await.result(runFJ(fib_fork, fib_join, 8), Duration.Inf) shouldEqual 21
   }
 
   /*
-  Reference implementation: define local reaction sites.
+  First implementation: define local reaction sites.
    */
-  it should "implement Fibonacci using fork-n-join with continuations" in {
+  it should "implement Fibonacci using fork-join with local sites" in {
+    def runFJ[A](
+      fork: A ⇒ Either[A, List[A]],
+      join: List[A] ⇒ A
+    ): (A, M[A]) ⇒ Unit = {
+      val run_fj = m[(A, M[A])] // This molecule carries (init_value, report_result).
+
+      site(go { case run_fj((x, report)) ⇒
+        fork(x) match {
+          case Left(result) ⇒ report(result)
+          case Right(subtasks) ⇒
+            // Define a reaction for the sub-tasks.
+            val sub_done = m[A]
+            val accum = m[List[A]]
+            site(go { case sub_done(res) + accum(xs) ⇒
+              val new_xs = res :: xs
+              // Are all subtasks done?
+              if (new_xs.length == subtasks.length) report(join(new_xs))
+              else accum(new_xs)
+            })
+            accum(Nil)
+            subtasks.foreach(s ⇒ run_fj((s, sub_done)))
+        }
+      })
+      (init_value, report_result) ⇒ run_fj((init_value, report_result))
+    }
+
+    val report_result = m[Int]
+    val get_result = b[Unit, Int]
+    site(go { case report_result(x) + get_result(_, r) ⇒ r(x) })
+    runFJ(fib_fork, fib_join)(8, report_result)
+    get_result() shouldEqual 21
+  }
+
+  /*
+  Second implementation: use a single reaction site but local continuations.
+   */
+  it should "implement Fibonacci using fork-join with continuations" in {
 
   }
 }
