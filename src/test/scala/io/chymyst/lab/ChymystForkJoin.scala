@@ -30,7 +30,7 @@ class ChymystForkJoin extends FlatSpec with Matchers {
   - Sub-tasks are never forked.
   - Results `r` from sub-tasks are merged (m) into the result for the task.
 
-  (Example: ternary search.)
+  Example: ternary search; find an element in a sorted array, |----.----.----|
   
      The initial task: _______    
                             x|
@@ -65,7 +65,7 @@ class ChymystForkJoin extends FlatSpec with Matchers {
   - Sub-tasks can be forked into sub-sub-tasks, etc., with no depth limit.
   - Results `r` from sub-tasks are merged (m) into the result for the task.
   
-  (Example: parallel merge-sort.)
+  Example: parallel merge-sort. Split into 2 sub-arrays, sort, merge.
     
   Computation looks like a tree:
   
