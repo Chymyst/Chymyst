@@ -1,11 +1,14 @@
 package io.chymyst.lab
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import io.chymyst.jc._
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
+import scala.reflect.ClassTag
 
 class ChymystForkJoin extends FlatSpec with Matchers {
 
@@ -213,9 +216,50 @@ class ChymystForkJoin extends FlatSpec with Matchers {
   /*
   Second implementation: use a single reaction site but local continuations.
   
-  Each new reaction site introduces extra overhead.
+  Each new reaction site introduces extra overhead. We can instead use continuations:
+  Each `start()` molecule will carry a continuation to be called on its result.
+  When a task is split, we put new continuations on the subtasks' `start()` molecules.
+  These continuations will collect and merge partial results, and report them as needed.
+  
+  It will be easier to implement the collect/merge using an `AtomicInteger` for counting. 
    */
   it should "implement Fibonacci using fork-join with continuations" in {
+    def runFJ[A: ClassTag](
+      fork: A ⇒ Either[A, List[A]],
+      join: List[A] ⇒ A
+    ): M[(A, A ⇒ Unit)] = { // Returns a new molecule emitter, called `start`.
 
+      val start = m[(A, A ⇒ Unit)] // The molecule carries (init_x, consume_result).
+      // `consume_result` is a continuation that must be called when this task is done.
+
+      site(go { case start((x, consume)) ⇒
+        fork(x) match {
+          case Left(result) ⇒ consume(result)
+          case Right(subtasks) ⇒
+            // The continuation for the sub-tasks will close over `counter` and `accum`.
+            val counter = new AtomicInteger(subtasks.length) // The counter will go to 0.
+            val accum = new Array[A](subtasks.length) // Sub-tasks will put results here.
+            val sub_report: A ⇒ Unit = { x ⇒
+              val newCounter = counter.decrementAndGet()
+              accum.update(newCounter, x)
+              if (newCounter == 0) // All subtasks are finished.
+              consume(join(accum.toList))
+            }
+            subtasks.foreach(s ⇒ start((s, sub_report)))
+        }
+      })
+      start
+    }
+
+    val report_result = m[Int]
+    val get_result = b[Unit, Int]
+    site(go { case report_result(x) + get_result(_, r) ⇒ r(x) })
+    val start = runFJ(fib_fork, fib_join)
+    
+    start((8, report_result))
+    get_result() shouldEqual 21
+
+    val elapsed = time { start((test_n, report_result)); get_result() }
+    println(f"Parallel/Continuations Fibonacci($test_n) in ${elapsed / 1000000.0}%.2f ms")
   }
 }
