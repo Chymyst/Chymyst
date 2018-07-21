@@ -37,9 +37,9 @@ class ChymystForkJoin extends FlatSpec with Matchers {
                           (f)|
                             / \
                           /    \
-                        x|    x|
+                        x|     |x
                       (d)|     |(d)
-                        r|    r|
+                        r|     |r
                          \    /
                           \ / 
                         (m)|
@@ -48,9 +48,9 @@ class ChymystForkJoin extends FlatSpec with Matchers {
                         (f)|
                           / \
                         /    \
-                      x|    x|
+                      x|     |x
                     (d)|     |(d)
-                      r|    r|
+                      r|     |r
                        \    /
                         \ / 
                       (m)|
@@ -74,16 +74,16 @@ class ChymystForkJoin extends FlatSpec with Matchers {
                           (f)|
                             / \
                           /    \
-                        x|    x|
+                        x|     |x
                       (f)|     |(d)
-                        / \   r|
+                        / \    |r
                       /    \   |
                     x|    x|   |
                   (d)|  (d)|   |
                     r|    r|   |
                      \    /    |
                       \ /      |
-                    (m)|      r|
+                    (m)|       |r
                        \      /
                         \   /      
                          \/
