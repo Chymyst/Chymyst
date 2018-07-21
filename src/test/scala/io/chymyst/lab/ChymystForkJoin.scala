@@ -9,6 +9,15 @@ import scala.concurrent.{Await, Future}
 
 class ChymystForkJoin extends FlatSpec with Matchers {
 
+  val test_n = 25
+
+  def time[A](x: ⇒ A): Long = {
+    val init = System.nanoTime()
+    x
+    val elapsed = System.nanoTime() - init
+    elapsed
+  }
+  
   behavior of "recursive fork-join"
 
   /*
@@ -121,6 +130,9 @@ class ChymystForkJoin extends FlatSpec with Matchers {
     }
 
     runFJ(fib_fork, fib_join, 8) shouldEqual 21
+    
+    val elapsed = time { runFJ(fib_fork, fib_join, test_n) }
+    println(f"Sequential Fibonacci($test_n) in ${elapsed / 1000000.0}%.2f ms")
   }
 
   /*
@@ -139,6 +151,9 @@ class ChymystForkJoin extends FlatSpec with Matchers {
     }
 
     Await.result(runFJ(fib_fork, fib_join, 8), Duration.Inf) shouldEqual 21
+ 
+    val elapsed = time { runFJ(fib_fork, fib_join, test_n) }
+    println(f"Parallel/Future Fibonacci($test_n) in ${elapsed / 1000000.0}%.2f ms")
   }
 
   /*
@@ -190,10 +205,15 @@ class ChymystForkJoin extends FlatSpec with Matchers {
     site(go { case report_result(x) + get_result(_, r) ⇒ r(x) })
     runFJ(fib_fork, fib_join)((8, report_result))
     get_result() shouldEqual 21
+
+    val elapsed = time { runFJ(fib_fork, fib_join)((test_n, report_result)); get_result() }
+    println(f"Parallel/Local sites Fibonacci($test_n) in ${elapsed / 1000000.0}%.2f ms")
   }
 
   /*
   Second implementation: use a single reaction site but local continuations.
+  
+  Each new reaction site introduces extra overhead.
    */
   it should "implement Fibonacci using fork-join with continuations" in {
 
