@@ -14,31 +14,34 @@ class ChymystForkJoin extends FlatSpec with Matchers {
   /*
   The non-recursive fork-join pattern (also called "map-reduce"):
   
-  - A task is either done sequentially (d) or forked into 2 sub-tasks (f).
+  - A task `x` is either done sequentially (d) or forked into 2 sub-tasks (f).
   - Sub-tasks are never forked.
-  - Results from sub-tasks are combined (c) into the result for the task.
+  - Results `r` from sub-tasks are merged (m) into the result for the task.
 
   (Example: ternary search.)
   
      The initial task: _______    
-                             |
+                            x|
                           (f)|
                             / \
                           /    \
-                         |     |
+                        x|    x|
                       (d)|     |(d)
+                        r|    r|
                          \    /
                           \ / 
-                        (c)|
+                        (m)|
                            |
+                          x|
                         (f)|
                           / \
                         /    \
-                       |     |
+                      x|    x|
                     (d)|     |(d)
+                      r|    r|
                        \    /
                         \ / 
-                      (c)|
+                      (m)|
                          ^
                          |_________ Return this final result.
   
@@ -46,32 +49,33 @@ class ChymystForkJoin extends FlatSpec with Matchers {
   
   The recursive fork-join pattern:
   
-  - A task is either done sequentially (d) or forked into 2 sub-tasks (f).
+  - A task `x` is either done sequentially (d) or forked into 2 sub-tasks (f).
   - Sub-tasks can be forked into sub-sub-tasks, etc., with no depth limit.
-  - Results from sub-tasks are combined (c) into the result for the task.
+  - Results `r` from sub-tasks are merged (m) into the result for the task.
   
   (Example: parallel merge-sort.)
     
   Computation looks like a tree:
   
      The initial task: _______    
-                             |
+                            x|
                           (f)|
                             / \
                           /    \
-                         |     |
+                        x|    x|
                       (f)|     |(d)
-                        / \    |
+                        / \   r|
                       /    \   |
-                     |     |   |
-                  (d)|  (f)|   |
+                    x|    x|   |
+                  (d)|  (d)|   |
+                    r|    r|   |
                      \    /    |
                       \ /      |
-                    (c)|       |
+                    (m)|      r|
                        \      /
                         \   /      
                          \/
-                      (c)|
+                      (m)|
                          ^
                          |_________ Return this final result.
                          
@@ -139,38 +143,52 @@ class ChymystForkJoin extends FlatSpec with Matchers {
 
   /*
   First implementation: define local reaction sites.
+  
+  Derivation:
+  - The initial data `x` must be on a molecule, say `start`.
+  - The final result `r` must be on another molecule, say `report`.
+  - After we emit `start()`, eventually `report()` will be emitted.
+  - When a task is split into subtasks, each subtask again emits `start()`.
+  - However, the subtasks should report their results separately from the main `report`.
+  Therefore, there must be a different `report` molecule for each set of subtasks.
+  - We need to define a new `report` molecule every time a task is split into subtasks.
+  - The results of subtasks need to be accumulated; so need a molecule carrying that data.
+  Call it `accum`.
+  - How does the result of `start()` know which `report` molecule to use? It cannot know.
+  Therefore, we need to pass the `report` emitter as a value on `start`.
+  - The `report` emitter has type `M[A]`. Hence, the type of `start` must be `M[(A, M[A])].
    */
   it should "implement Fibonacci using fork-join with local sites" in {
     def runFJ[A](
       fork: A ⇒ Either[A, List[A]],
       join: List[A] ⇒ A
-    ): (A, M[A]) ⇒ Unit = {
-      val run_fj = m[(A, M[A])] // This molecule carries (init_value, report_result).
+    ): M[(A, M[A])] = { // Returns a new molecule emitter, called `start`.
+      
+      val start = m[(A, M[A])] // This molecule carries (init_x, report_result).
 
-      site(go { case run_fj((x, report)) ⇒
+      site(go { case start((x, report)) ⇒
         fork(x) match {
           case Left(result) ⇒ report(result)
-          case Right(subtasks) ⇒
-            // Define a reaction for the sub-tasks.
-            val sub_done = m[A]
-            val accum = m[List[A]]
-            site(go { case sub_done(res) + accum(xs) ⇒
+          case Right(subtasks) ⇒ // Define a reaction for the sub-tasks.
+            val sub_report = m[A] // The `report` molecule of a sub-task.
+            val accum = m[List[A]] // List of results computed by sub-tasks so far.
+            site(go { case sub_report(res) + accum(xs) ⇒
               val new_xs = res :: xs
               // Are all subtasks done?
               if (new_xs.length == subtasks.length) report(join(new_xs))
               else accum(new_xs)
             })
             accum(Nil)
-            subtasks.foreach(s ⇒ run_fj((s, sub_done)))
+            subtasks.foreach(s ⇒ start((s, sub_report)))
         }
       })
-      (init_value, report_result) ⇒ run_fj((init_value, report_result))
+      start
     }
 
     val report_result = m[Int]
     val get_result = b[Unit, Int]
     site(go { case report_result(x) + get_result(_, r) ⇒ r(x) })
-    runFJ(fib_fork, fib_join)(8, report_result)
+    runFJ(fib_fork, fib_join)((8, report_result))
     get_result() shouldEqual 21
   }
 
