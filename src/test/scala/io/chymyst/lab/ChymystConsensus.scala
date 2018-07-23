@@ -62,8 +62,9 @@ that function on a molecule.
 
   it should "run multiple processes and achieve consensus" in {
     val decide = make_co[Int]
+    decide.setLogLevel(4)
     (1 to 10).foreach { i ⇒ go_routine(println(decide(i))) }
-    Thread.sleep(100)
+    Thread.sleep(1000)
 
     /* Printed result:
 5
