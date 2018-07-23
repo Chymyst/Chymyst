@@ -29,14 +29,21 @@ class ChymystConsensus extends FlatSpec with Matchers {
   We need to represent the information about whether we already have a consensus.
   It is natural to put that information on the `consensus()` molecule as Option[X].
   The reaction then needs to reply to `decide()` with the consensus value, if any.
+
+  go { case decide(x, r) + consensus(c) ⇒ ??? }
+
+  If c is None, we have no consensus yet; so we can set it to `x` and reply with `x`.
+  If c is Some(y), we already have consensus, and it is `y`. So we reply with `y`.
    */
   def make_co[X]: B[X, X] = {
     val decide = b[X, X]
     val consensus = m[Option[X]]
     site(
-      go { case decide(x, r) + consensus(None) ⇒ r(x); consensus(Some(x)) },
-      go { case decide(_, r) + consensus(Some(y)) ⇒ r(y); consensus(Some(y)) },
-      go { case _ ⇒ consensus(None) } // `consensus()` is a static molecule.
+      go { case decide(x, r) + consensus(c) ⇒
+        val decision = c.getOrElse(x)
+        r(decision); consensus(Some(decision))
+      },
+      go { case _ ⇒ consensus(None) } // So that `consensus()` is a static molecule.
     )
     decide
   }
@@ -57,5 +64,18 @@ that function on a molecule.
     val decide = make_co[Int]
     (1 to 10).foreach { i ⇒ go_routine(println(decide(i))) }
     Thread.sleep(100)
+
+    /* Printed result:
+5
+5
+5
+5
+5
+5
+5
+5
+5
+5
+     */
   }
 }
