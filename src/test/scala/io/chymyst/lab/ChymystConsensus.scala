@@ -36,7 +36,7 @@ class ChymystConsensus extends FlatSpec with Matchers {
     site(
       go { case decide(x, r) + consensus(None) ⇒ r(x); consensus(Some(x)) },
       go { case decide(_, r) + consensus(Some(y)) ⇒ r(y); consensus(Some(y)) },
-      go { case _ ⇒ consensus(None)}
+      go { case _ ⇒ consensus(None) } // `consensus()` is a static molecule.
     )
     decide
   }
@@ -55,7 +55,7 @@ that function on a molecule.
 
   it should "run multiple processes and achieve consensus" in {
     val decide = make_co[Int]
-    (1 to 10).foreach { i ⇒ go_routine { println(decide(i)) } }
+    (1 to 10).foreach { i ⇒ go_routine(println(decide(i))) }
     Thread.sleep(100)
   }
 }
