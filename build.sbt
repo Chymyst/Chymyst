@@ -66,8 +66,9 @@ lazy val chymyst = (project in file("."))
     tutTargetDirectory := baseDirectory.value / "docs",
     scalacOptions in Tut := scalacOptions.value.filterNot(disableWarningsForTut.contains),
     libraryDependencies ++= Seq(
-      "io.chymyst" %% "chymyst-core" % "0.2.0",
-      "org.scalatest" %% "scalatest" % "3.0.4" % Test
+      "io.chymyst" %% "chymyst-core" % "0.2.0"
+      , "org.scalatest" %% "scalatest" % "3.0.4" % Test
+      , "org.scalaz" %% "scalaz-zio" % "0.2.7" % Test
     )
   )
 
