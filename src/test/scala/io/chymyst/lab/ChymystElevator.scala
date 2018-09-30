@@ -40,8 +40,8 @@ class ChymystElevator extends FlatSpec with Matchers {
   Elevators will be static molecules.
   This will allow us to read their state easily and quickly, and also help with code correctness.
 
-  The downside is that we have to define all elevators statically. This will do for now.
-  Later, we can refactor this code to remove the repetition.
+  The downside is that we have to define all elevators statically:
+    we cannot add more elevators later, or disable some elevators. This will do for now.
    */
 
   type ElevNumber = Int
@@ -67,7 +67,7 @@ class ChymystElevator extends FlatSpec with Matchers {
     val tick3 = m[Unit]
 
     // Compute the next state of an elevator after one step.
-    def step: ElevState ⇒ ElevState = {
+    val step: ElevState ⇒ ElevState = {
       case s@ElevState(_, Nil) ⇒ s // Idle elevator.
       case ElevState(current, next :: rest) ⇒
         val nextFloor = (next compare current) + current
@@ -76,47 +76,157 @@ class ChymystElevator extends FlatSpec with Matchers {
     }
 
     // Define reactions for applying one step.
-    val delay = m[M[Unit]]
-    val delayR = go { case delay(t) ⇒ BlockingIdle(Thread.sleep(100L)); t() }
-    val step1R = go { case elev1(s) + tick1(_) ⇒ elev1(step(s)); delay(tick1) }
-    val step2R = go { case elev2(s) + tick2(_) ⇒ elev2(step(s)); delay(tick2) }
-    val step3R = go { case elev3(s) + tick3(_) ⇒ elev3(step(s)); delay(tick3) }
+
+    val emitAfter = m[(M[Unit], Long)]
+    val emitAfterR = go { case emitAfter((t, d)) ⇒ BlockingIdle(Thread.sleep(d)); t() }
+
+    // Elevators may have different speeds.
+    val step1R = go { case elev1(s) + tick1(_) ⇒ elev1(step(s)); emitAfter((tick1, 100L)) }
+    val step2R = go { case elev2(s) + tick2(_) ⇒ elev2(step(s)); emitAfter((tick2, 120L)) }
+    val step3R = go { case elev3(s) + tick3(_) ⇒ elev3(step(s)); emitAfter((tick3, 150L)) }
 
     // Each passenger's request, as it is being sent, is modeled by molecule `req`.
-    // A pending request is modeled by `pending`.
+    // A delayed request is modeled by `delayed`.
     // A signal for an elevator to accept a request is `accept`.
-    // A notification for passenger is `proceedTo`.
+    // A notification for passenger will be printed to stdout.
 
-    case class ReqState(from: Floor, to: Floor)
+    case class Request(from: Floor, to: Floor, passenger: String)
 
-    val req = m[ReqState]
-    val pending = m[ReqState]
+    val req = m[Request]
+    val delayed = m[Request]
 
-    val accept1 = m[Floor]
-    val accept2 = m[Floor]
-    val accept3 = m[Floor]
+    val accept1 = m[Request]
+    val accept2 = m[Request]
+    val accept3 = m[Request]
 
-    val proceedTo = m[ElevNumber]
+    // An elevator may accept or refuse a request, depending on the current state.
+
+    // Idle elevators always accept.
+    def idleAccept(r: Request, state: ElevState): ElevState = {
+      state.copy(stops = List(r.from, r.to))
+    }
+
+    // Return the updated elevator state if a request is accepted, otherwise `None`.
+    def canAcceptRequest(r: Request, state: ElevState): Option[ElevState] = {
+      state.stops.headOption match {
+        case None ⇒ // Elevator is idle, accepts requests.
+          Some(idleAccept(r, state))
+        case Some(next) ⇒ // Elevator is at `current` floor, moving towards `next` floor.
+          // The `r.from` floor needs to be between `current` and `next`, not equal to `current`.
+          if ((r.from > state.current && r.from <= next) || (r.from < state.current && r.from >= next))
+            if (r.from == next)
+              Some(state)
+            else Some(state.copy(stops = r.from :: state.stops))
+          else None
+      }
+    }
 
     // The system decides whether some elevator can accept the request.
-    def choose(from: Floor, to: Floor, states: Seq[ElevState]): Option[ElevNumber] = {
-      ???
-    }
+    // The elevator must be idle, or it must be moving towards floor A in the direction of floor B.
+    def choose(r: Request, states: Seq[ElevState]): Option[ElevNumber] = {
 
-    // A passenger sends a request.
-    val reqR = go { case req(ReqState(from, to)) ⇒
-      // Use volatile readers for elevator states.
-      val states = Seq(elev1, elev2, elev3).map(_.volatileValue)
-      choose(from, to, states) match {
-        case Some(n) ⇒ // Send an `accept` signal to elevator number `n`.
-          val accept = Seq(accept1, accept2, accept3)(n)
-          accept(from)
-          proceedTo(n)
-        case None ⇒ pending(ReqState(from, to)) // Request still pending.
+      val canAccept: ((ElevState, Int)) ⇒ Boolean = {
+        case (s, _) ⇒ canAcceptRequest(r, s).nonEmpty
       }
 
+      val distance: ((ElevState, Int)) ⇒ Int = {
+        case (s, _) ⇒ math.abs(s.current - r.from)
+      }
+
+      // Select elevators that are either idle or moving in the correct direction.
+      // From thise, select the closest one.
+      states.zipWithIndex.filter(canAccept).sortBy(distance).headOption.map(_._2)
     }
 
+    // A passenger sends a request. An elevator may be chosen and asked to accept the request.
+    val reqR = go { case req(r) ⇒
+      // Use volatile readers for elevator states.
+      val states = Seq(elev1, elev2, elev3).map(_.volatileValue)
+      choose(r, states) match {
+        case Some(i) ⇒
+          println(s"Sending an `accept` signal to elevator $i for $r")
+          val accept = Seq(accept1, accept2, accept3)(i)
+          accept(r)
+        case None ⇒
+          println(s"No elevator available, $r delayed")
+          delayed(r) // Request delayed, will be accepted later by an idle elevator.
+      }
+    }
+
+    // Keep track of how many requests still remain unfulfilled.
+    val remain = m[Int]
+
+    def guidePassenger(r: Request, i: ElevNumber): Unit = {
+      println(s"Passenger ${r.passenger} on floor ${r.from} please proceed to elevator $i")
+    }
+
+    // Request will be refused if the elevator already moved past the requested floor.
+    def decideAccept(r: Request, s: ElevState, i: ElevNumber, rem: Int): ElevState = {
+      canAcceptRequest(r, s) match {
+        case Some(newState) ⇒
+          guidePassenger(r, i)
+          remain(rem - 1)
+          newState
+
+        case None ⇒
+          req(r) // Try again - perhaps another elevator can accept.
+          remain(rem)
+          s // Elevator state is unchanged.
+
+      }
+    }
+
+    val acc1R = go { case accept1(r) + elev1(s) + remain(k) ⇒ elev1(decideAccept(r, s, 1, k)) }
+    val acc2R = go { case accept2(r) + elev2(s) + remain(k) ⇒ elev2(decideAccept(r, s, 2, k)) }
+    val acc3R = go { case accept3(r) + elev3(s) + remain(k) ⇒ elev3(decideAccept(r, s, 3, k)) }
+
+    // Delayed requests are served by idle elevators.
+
+    val delayed1R = go { case delayed(r) + elev1(s@ElevState(_, Nil)) + remain(k) ⇒
+      elev1(idleAccept(r, s)); guidePassenger(r, 1); remain(k - 1)
+    }
+    val delayed2R = go { case delayed(r) + elev2(s@ElevState(_, Nil)) + remain(k) ⇒
+      elev2(idleAccept(r, s)); guidePassenger(r, 2); remain(k - 1)
+    }
+    val delayed3R = go { case delayed(r) + elev3(s@ElevState(_, Nil)) + remain(k) ⇒
+      elev3(idleAccept(r, s)); guidePassenger(r, 3); remain(k - 1)
+    }
+
+    // Signal when all requests are fulfilled and all elevators are idle.
+    val untilFinished = b[Unit, Unit]
+    val finishedR = go { case untilFinished(_, reply) + remain(0) +
+      elev1(s1@ElevState(_, Nil)) + elev2(s2@ElevState(_, Nil)) + elev3(s3@ElevState(_, Nil)) ⇒
+      reply()
+      elev1(s1)
+      elev2(s2)
+      elev3(s3)
+    }
+
+    site(
+      elev1S, elev2S, elev3S,
+      emitAfterR,
+      step1R, step2R, step3R,
+      reqR,
+      acc1R, acc2R, acc3R,
+      delayed1R, delayed2R, delayed3R,
+      finishedR
+    )
+
+    // Run the simulation: emit the initial molecules.
+    Seq(tick1, tick2, tick3).foreach(_.apply())
+
+    // Passengers send 100 requests at random times.
+    import scala.util.Random.nextInt
+    val n = 100
+    remain(n)
+
+    (1 to n).foreach { i ⇒
+      Thread.sleep(nextInt(100) + 100L)
+      req(Request(nextInt(20) + 1, nextInt(20) + 1, s"Name-$i"))
+    }
+
+    // Wait until all passenger requests are served.
+    untilFinished()
   }
 
 }
