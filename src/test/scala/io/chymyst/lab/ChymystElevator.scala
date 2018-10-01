@@ -113,11 +113,6 @@ class ChymystElevator extends FlatSpec with Matchers {
     println(s"*** Passenger ${r.passenger} at floor ${r.from} please proceed to elevator $i (currently at floor ${s.current}) ***")
   }
 
-  val emitAfter = m[(M[Unit], Long)]
-  val emitAfterR = go { case emitAfter((t, d)) ⇒
-    BlockingIdle(Thread.sleep(d)); t()
-  }
-
   it should "run the 3-elevator system" in {
 
     val elev1 = m[ElevState]
@@ -137,6 +132,10 @@ class ChymystElevator extends FlatSpec with Matchers {
     val tick3 = m[Unit]
 
     // Define reactions for applying one step.
+    val emitAfter = m[(M[Unit], Long)]
+    val emitAfterR = go { case emitAfter((t, d)) ⇒
+      BlockingIdle(Thread.sleep(d)); t()
+    }
 
     // Elevators may have different speeds.
     val step1R = go { case elev1(s) + tick1(_) ⇒
@@ -274,6 +273,10 @@ class ChymystElevator extends FlatSpec with Matchers {
     val ticks = Seq.fill(range)(m[Unit])
 
     // Define reactions for applying one step.
+    val emitAfter = m[(M[Unit], Long)]
+    val emitAfterR = go { case emitAfter((t, d)) ⇒
+      BlockingIdle(Thread.sleep(d)); t()
+    }
 
     // Elevators may have different speeds.
     val stepsR = (elevs zip ticks).zipWithIndex map { case ((elev, tick), i) ⇒
