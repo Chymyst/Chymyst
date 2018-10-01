@@ -19,7 +19,7 @@ class ChymystElevator extends FlatSpec with Matchers {
     https://github.com/doanduyhai/elevator-control-system
   Implementation using Akka Streams: https://github.com/krausb/elevator
 
-  - Elevator state: current floor and a list of next stops, which are all in one direction of motion from the current stops.
+  - Elevator state: current floor and a list of next stops.
   - Elevators move floor by floor at fixed speed, deleting next stop from their state when reaching that floor.
   - A passenger sends a request "from floor A to floor B".
   - The system will look for a nearest elevator to floor A that is moving in the correct direction from A to B.
@@ -38,7 +38,7 @@ class ChymystElevator extends FlatSpec with Matchers {
   To simulate this system using the Chemical Machine, we start by writing down
   all the data that needs to be handled concurrently.
 
-  An elevator's state is modeled by molecule `elev`.
+  An elevator's state is modeled by molecules `elev1`, `elev2`, ...
 
   Elevators will be static molecules.
   This will allow us to read their state easily and quickly, and also help with code correctness.
@@ -48,13 +48,13 @@ class ChymystElevator extends FlatSpec with Matchers {
   This will do for now.
    */
 
-  type ElevNumber = Int
+  type ElevIndex = Int
   type Floor = Int
 
   case class ElevState(current: Floor = 0, stops: List[Floor] = Nil)
 
   // Compute the next state of an elevator after one step.
-  def step(s: ElevState, i: ElevNumber): ElevState = s match {
+  def step(s: ElevState, i: ElevIndex): ElevState = s match {
     case ElevState(_, Nil) ⇒ s // Idle elevators remain idle.
     case ElevState(current, next :: rest) ⇒
       val nextFloor = (next compare current) + current
@@ -91,7 +91,7 @@ class ChymystElevator extends FlatSpec with Matchers {
 
   // The system decides whether some elevator can accept the request.
   // The elevator must be idle, or it must be moving towards floor A in the direction of floor B.
-  def choose(r: Request, states: Seq[ElevState]): Option[ElevNumber] = {
+  def choose(r: Request, states: Seq[ElevState]): Option[ElevIndex] = {
 
     val canAccept: ((ElevState, Int)) ⇒ Boolean = {
       case (s, _) ⇒ canAcceptRequest(r, s).nonEmpty
@@ -109,7 +109,7 @@ class ChymystElevator extends FlatSpec with Matchers {
       .headOption.map(_._2)
   }
 
-  def guidePassenger(r: Request, s: ElevState, i: ElevNumber): Unit = {
+  def guidePassenger(r: Request, s: ElevState, i: ElevIndex): Unit = {
     println(s"*** Passenger ${r.passenger} at floor ${r.from} please proceed to elevator $i (currently at floor ${s.current}) ***")
   }
 
@@ -180,7 +180,7 @@ class ChymystElevator extends FlatSpec with Matchers {
 
     // Request will be refused if the elevator already moved past the requested floor.
     // We also keep track of the remaining unfulfilled requests (for test purposes).
-    def decideAccept(r: Request, s: ElevState, i: ElevNumber, rem: Int): ElevState = {
+    def decideAccept(r: Request, s: ElevState, i: ElevIndex, rem: Int): ElevState = {
       canAcceptRequest(r, s) match {
         case Some(newState) ⇒
           guidePassenger(r, s, i)
@@ -260,7 +260,7 @@ class ChymystElevator extends FlatSpec with Matchers {
   }
 
   it should "run n-elevator example" in {
-    val range = 5 // We have this many elevators.
+    val range = 10 // We have this many elevators.
 
     val elevs = Seq.fill(range)(m[ElevState])
 
@@ -309,7 +309,7 @@ class ChymystElevator extends FlatSpec with Matchers {
     val remain = m[Int]
 
     // Request will be refused if the elevator already moved past the requested floor.
-    def decideAccept(r: Request, s: ElevState, i: ElevNumber, rem: Int): ElevState = {
+    def decideAccept(r: Request, s: ElevState, i: ElevIndex, rem: Int): ElevState = {
       canAcceptRequest(r, s) match {
         case Some(newState) ⇒
           guidePassenger(r, s, i); remain(rem - 1); newState
@@ -345,7 +345,8 @@ class ChymystElevator extends FlatSpec with Matchers {
 
     val finishedR = go { case untilFinished(_, reply) + idleElevators(`range`) ⇒ reply() }
 
-    val allReactions = elevS ++ stepsR ++ accRs ++ delayedRs ++
+    val allReactions: Seq[Reaction] =
+      elevS ++ stepsR ++ accRs ++ delayedRs ++
       Seq(emitAfterR, reqR, finishedR, allDoneR) ++ checkIdleR
 
     site(allReactions: _*)
