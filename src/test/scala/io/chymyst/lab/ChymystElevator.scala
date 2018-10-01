@@ -312,15 +312,17 @@ class ChymystElevator extends FlatSpec with Matchers {
     // Signal when all requests are fulfilled and all elevators are idle.
     val untilFinished = b[Unit, Unit]
     val idleElevators = m[Int]
+    val checkIdles = Seq.fill(range)(m[Unit])
+    val checkIdleR = (checkIdles zip elevs) map { case (checkIdle, elev) ⇒
+      go { case idleElevators(i) + checkIdle(_) + elev(s@ElevState(_, Nil)) ⇒ elev(s); idleElevators(i + 1) }
+    }
     // Once all requests are served, we compute the number of idle elevators.
-    val allDoneR = go { case remain(0) ⇒ idleElevators(0) }
-    val addIdleR = elevs map (elev ⇒ go { case idleElevators(i) + elev(s@ElevState(_, Nil)) ⇒
-      elev(s); idleElevators(i + 1)
-    })
+    val allDoneR = go { case remain(0) ⇒ idleElevators(0); checkIdles.foreach(_.apply()) }
+
     val finishedR = go { case untilFinished(_, reply) + idleElevators(`range`) ⇒ reply() }
 
     val allReactions = elevS ++ stepsR ++ accRs ++ delayedRs ++
-      Seq(emitAfterR, reqR, finishedR, allDoneR) ++ addIdleR
+      Seq(emitAfterR, reqR, finishedR, allDoneR) ++ checkIdleR
 
     site(allReactions: _*)
 
