@@ -285,11 +285,6 @@ class ChymystElevator extends FlatSpec with Matchers {
       }
     }
 
-    // Each passenger's request, as it is being sent, is modeled by molecule `req`.
-    // A delayed request is modeled by `delayed`.
-    // A signal for an elevator to accept a request is `accept`.
-    // A notification for passenger will be printed to stdout.
-
     val req = m[Request]
     val delayed = m[Request]
 
