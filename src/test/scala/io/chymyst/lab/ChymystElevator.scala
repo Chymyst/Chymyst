@@ -44,7 +44,8 @@ class ChymystElevator extends FlatSpec with Matchers {
   This will allow us to read their state easily and quickly, and also help with code correctness.
 
   The downside is that we have to define all elevators statically:
-    we cannot add more elevators later, or disable some elevators. This will do for now.
+    we cannot add more elevators later, or disable some elevators.
+  This will do for now.
    */
 
   type ElevNumber = Int
@@ -54,11 +55,12 @@ class ChymystElevator extends FlatSpec with Matchers {
 
   // Compute the next state of an elevator after one step.
   def step(s: ElevState, i: ElevNumber): ElevState = s match {
-    case ElevState(_, Nil) ⇒ s // Idle elevator remains idle.
+    case ElevState(_, Nil) ⇒ s // Idle elevators remain idle.
     case ElevState(current, next :: rest) ⇒
       val nextFloor = (next compare current) + current
       val nextStops = if (nextFloor == next) rest else next :: rest
-      if (nextStops.isEmpty) println(s"Elevator $i becomes idle at floor ${s.current}")
+      if (nextStops.isEmpty)
+        println(s"Elevator $i becomes idle at floor ${s.current}")
       s.copy(current = nextFloor, stops = nextStops) // Advance to next floor.
   }
 
@@ -76,7 +78,8 @@ class ChymystElevator extends FlatSpec with Matchers {
     state.stops.headOption match {
       case None ⇒ // Elevator is idle, accepts requests.
         Some(idleAccept(r, state))
-      case Some(next) ⇒ // Elevator is at `current` floor, moving towards `next` floor.
+      case Some(next) ⇒
+        // Elevator is at `current` floor, moving towards `next` floor.
         // The `r.from` floor needs to be between `current` and `next`, not equal to `current`.
         if ((r.from > state.current && r.from <= next) || (r.from < state.current && r.from >= next))
           if (r.from == next)
@@ -99,12 +102,20 @@ class ChymystElevator extends FlatSpec with Matchers {
     }
 
     // Select elevators that are either idle or moving in the correct direction.
-    // From thise, select the closest one.
-    states.zipWithIndex.filter(canAccept).sortBy(distance).headOption.map(_._2)
+    // From these, select the closest one.
+    states.zipWithIndex
+      .filter(canAccept)
+      .sortBy(distance)
+      .headOption.map(_._2)
   }
 
   def guidePassenger(r: Request, s: ElevState, i: ElevNumber): Unit = {
-    println(s"*** Passenger ${r.passenger} at floor ${r.from} please proceed to elevator $i (currently at floor ${s.current})")
+    println(s"*** Passenger ${r.passenger} at floor ${r.from} please proceed to elevator $i (currently at floor ${s.current}) ***")
+  }
+
+  val emitAfter = m[(M[Unit], Long)]
+  val emitAfterR = go { case emitAfter((t, d)) ⇒
+    BlockingIdle(Thread.sleep(d)); t()
   }
 
   it should "run the 3-elevator system" in {
@@ -127,13 +138,16 @@ class ChymystElevator extends FlatSpec with Matchers {
 
     // Define reactions for applying one step.
 
-    val emitAfter = m[(M[Unit], Long)]
-    val emitAfterR = go { case emitAfter((t, d)) ⇒ BlockingIdle(Thread.sleep(d)); t() }
-
     // Elevators may have different speeds.
-    val step1R = go { case elev1(s) + tick1(_) ⇒ elev1(step(s, 1)); emitAfter((tick1, 110L)) }
-    val step2R = go { case elev2(s) + tick2(_) ⇒ elev2(step(s, 2)); emitAfter((tick2, 120L)) }
-    val step3R = go { case elev3(s) + tick3(_) ⇒ elev3(step(s, 3)); emitAfter((tick3, 130L)) }
+    val step1R = go { case elev1(s) + tick1(_) ⇒
+      elev1(step(s, 1)); emitAfter((tick1, 110L))
+    }
+    val step2R = go { case elev2(s) + tick2(_) ⇒
+      elev2(step(s, 2)); emitAfter((tick2, 120L))
+    }
+    val step3R = go { case elev3(s) + tick3(_) ⇒
+      elev3(step(s, 3)); emitAfter((tick3, 130L))
+    }
 
     // Each passenger's request, as it is being sent, is modeled by molecule `req`.
     // A delayed request is modeled by `delayed`.
@@ -166,6 +180,7 @@ class ChymystElevator extends FlatSpec with Matchers {
     val remain = m[Int]
 
     // Request will be refused if the elevator already moved past the requested floor.
+    // We also keep track of the remaining unfulfilled requests (for test purposes).
     def decideAccept(r: Request, s: ElevState, i: ElevNumber, rem: Int): ElevState = {
       canAcceptRequest(r, s) match {
         case Some(newState) ⇒
@@ -180,12 +195,18 @@ class ChymystElevator extends FlatSpec with Matchers {
       }
     }
 
-    val acc1R = go { case accept1(r) + elev1(s) + remain(k) ⇒ elev1(decideAccept(r, s, 1, k)) }
-    val acc2R = go { case accept2(r) + elev2(s) + remain(k) ⇒ elev2(decideAccept(r, s, 2, k)) }
-    val acc3R = go { case accept3(r) + elev3(s) + remain(k) ⇒ elev3(decideAccept(r, s, 3, k)) }
+    val acc1R = go { case accept1(r) + elev1(s) + remain(k) ⇒
+      elev1(decideAccept(r, s, 1, k))
+    }
+    val acc2R = go { case accept2(r) + elev2(s) + remain(k) ⇒
+      elev2(decideAccept(r, s, 2, k))
+    }
+    val acc3R = go { case accept3(r) + elev3(s) + remain(k) ⇒
+      elev3(decideAccept(r, s, 3, k))
+    }
 
     // Delayed requests are served by idle elevators.
-
+    // Also need to keep track of the remaining requests.
     val delayed1R = go { case delayed(r) + elev1(s@ElevState(_, Nil)) + remain(k) ⇒
       elev1(idleAccept(r, s)); guidePassenger(r, s, 1); remain(k - 1)
     }
@@ -197,15 +218,21 @@ class ChymystElevator extends FlatSpec with Matchers {
     }
 
     // Signal when all requests are fulfilled and all elevators are idle.
+    // A simplistic approach is to have a reaction consuming all molecules at once.
     val untilFinished = b[Unit, Unit]
-    val finishedR = go { case untilFinished(_, reply) + remain(0) +
-      elev1(s1@ElevState(_, Nil)) + elev2(s2@ElevState(_, Nil)) + elev3(s3@ElevState(_, Nil)) ⇒
+    val finishedR = go { case
+      untilFinished(_, reply) +
+        remain(0) +
+        elev1(s1@ElevState(_, Nil)) +
+        elev2(s2@ElevState(_, Nil)) +
+        elev3(s3@ElevState(_, Nil)) ⇒
       reply()
       elev1(s1)
       elev2(s2)
       elev3(s3)
     }
 
+    // Activate all reactions in a single reaction site, for simplicity.
     site(
       elev1S, elev2S, elev3S,
       emitAfterR,
@@ -221,6 +248,7 @@ class ChymystElevator extends FlatSpec with Matchers {
 
     // Passengers send 100 requests at random times.
     val n = 100
+    // For this test, we keep track of how many requests remain pending.
     remain(n)
 
     (1 to n).foreach { i ⇒
@@ -233,7 +261,6 @@ class ChymystElevator extends FlatSpec with Matchers {
   }
 
   it should "run n-elevator example" in {
-
     val range = 5 // We have this many elevators.
 
     val elevs = Seq.fill(range)(m[ElevState])
@@ -248,12 +275,11 @@ class ChymystElevator extends FlatSpec with Matchers {
 
     // Define reactions for applying one step.
 
-    val emitAfter = m[(M[Unit], Long)]
-    val emitAfterR = go { case emitAfter((t, d)) ⇒ BlockingIdle(Thread.sleep(d)); t() }
-
     // Elevators may have different speeds.
     val stepsR = (elevs zip ticks).zipWithIndex map { case ((elev, tick), i) ⇒
-      go { case elev(s) + tick(_) ⇒ elev(step(s, i)); emitAfter((tick, 100L + 10 * i)) }
+      go { case elev(s) + tick(_) ⇒
+        elev(step(s, i)); emitAfter((tick, 100L + 10 * i))
+      }
     }
 
     // Each passenger's request, as it is being sent, is modeled by molecule `req`.
