@@ -156,6 +156,8 @@ object ChymystGuessGame extends App {
   waitForGameOver()
   System.exit(0)
 
-  // To improve performance when many questions are asked, we should use BlockingIdle() around delay(),
-  // and/or inline the `idle() ⇒` reaction body into the previous reaction.
+  // To improve performance when many questions are asked, we should inline the `idle() ⇒` reaction body into the previous reaction.
+  // There is also another issue with this code:
+  // If a single reaction site is used and the player asks many questions quickly, all threads will be busy computing answers, and reactions for `readGuess()` will be greatly delayed.
+  // To fix this, we should split the reactions across two separate reaction sites, so that the thread starvation does not affect the reactions handling the console interaction.
 }
