@@ -155,4 +155,7 @@ object ChymystGuessGame extends App {
   canShow() // This molecule is a contention token and must be emitted at the start.
   waitForGameOver()
   System.exit(0)
+
+  // To improve performance when many questions are asked, we should use BlockingIdle() around delay(),
+  // and/or inline the `idle() ⇒` reaction body into the previous reaction.
 }
