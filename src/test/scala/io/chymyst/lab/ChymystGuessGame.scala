@@ -12,7 +12,7 @@ object ChymystGuessGame extends App {
   Guess-a-number game with asynchronous questions.
   
   The machine chooses a number `x` between 1 and 100.
-  The player asks questions of the form "is the number X greater than N" for N chosen by the player.
+  The player asks questions of the form "Is the number X greater than N" for N chosen by the player.
   The machine answers "yes" or "no" after an unpredictable delay.
   
   The player should be able to ask questions at any time.
@@ -48,7 +48,10 @@ object ChymystGuessGame extends App {
     * @return The machine's response to the player's guess.
     */
   def answerMessage(x: Int, guess: Int): String =
-    if (x == guess) s"Correct, the number is $x." else s"The number X is ${if (x > guess) "" else "not "}greater than $guess."
+    if (x == guess)
+      s"Correct, the number is $x."
+    else
+      s"The number X is ${if (x > guess) "" else "not "}greater than $guess."
 
   /** Wait a random number of milliseconds between `delayMs` and `2*delayMs`.
     */
@@ -75,8 +78,10 @@ object ChymystGuessGame extends App {
   We begin by drafting the code of these reactions:
   
   ```scala
-  go { case canShow(_) ⇒ val guess = readGuess(); ... }
-  go { case canShow(_) ⇒ println(answer_message); ... }
+  go { case canShow(_) ⇒ val guess = readGuess(); canShow() ... }
+  go { case canShow(_) ⇒ println(answer_message); canShow() ... }
+  ...
+  canShow()
 
   ```
   
@@ -92,7 +97,8 @@ object ChymystGuessGame extends App {
   
   ```
   
-  The machine's answer needs to be emitted by a reaction of the form `question(...) ⇒ delay(); answer(...)`.
+  The machine's answer needs to be emitted by a reaction of the form
+  `go { case question(...) ⇒ delay(); answer(...) }`.
   To provide input to that reaction, we need a molecule that carries the player's question (an `Int` value).
    */
   val question = m[Int]
@@ -115,7 +121,10 @@ object ChymystGuessGame extends App {
   val canAsk = m[Unit]
   /*
   ```scala
-  go { canShow(_) ⇒ val guess = readGuess(); question(guess); canShow(); idle() }
+  go { canShow(_) + canAsk(_) ⇒
+    val guess = readGuess()
+    question(guess); canShow(); idle()
+  }
   go { idle() ⇒ readline(); canAsk() }
   
   ```
