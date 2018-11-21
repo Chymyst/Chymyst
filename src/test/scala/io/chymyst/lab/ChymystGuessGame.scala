@@ -184,7 +184,8 @@ object GuessGame2 extends App {
 
   We only need at most 2 reactions to run at once in this reaction site, so we use FixedPool(2).
   */
-  site(FixedPool(2))(
+  val pool = FixedPool(2)
+  site(pool)(
     go { case canAsk(_) + canShow(_) ⇒ question(readGuess()); canShow(); readLine(); canAsk() },
     go { case answer(ans) + canShow(_) ⇒ println(ans); canShow() },
     go { case gameOver(msg) + waitForGameOver(_, r) ⇒ println(msg); r() }
