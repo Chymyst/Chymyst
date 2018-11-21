@@ -142,12 +142,13 @@ object ChymystGuessGame extends App {
   site(
     go { case canAsk(_) + canShow(_) ⇒ question(readGuess()); canShow(); idle() },
     go { case idle(_) ⇒ readLine(); canAsk() },
-    go { case question(guess) ⇒ 
+    go { case question(guess) ⇒
       delay()
       val ans = answerMessage(x, guess)
-      if (guess == x) gameOver(ans) else answer(ans) },
+      if (guess == x) gameOver(ans) else answer(ans)
+    },
     go { case answer(ans) + canShow(_) ⇒ println(ans); canShow() },
-    go { case gameOver(msg) + waitForGameOver(_, r) ⇒ println(msg); r()}
+    go { case gameOver(msg) + waitForGameOver(_, r) ⇒ println(msg); r() }
   )
 
   // Initially, the console is idle.
@@ -159,5 +160,48 @@ object ChymystGuessGame extends App {
   // To improve performance when many questions are asked, we should inline the `idle() ⇒` reaction body into the previous reaction.
   // There is also another issue with this code:
   // If a single reaction site is used and the player asks many questions quickly, all threads will be busy computing answers, and reactions for `readGuess()` will be greatly delayed.
-  // To fix this, we should split the reactions across two separate reaction sites, so that the thread starvation does not affect the reactions handling the console interaction.
+  // To fix this, we should split the reactions across two separate reaction sites and assign separate thread pools to these two sites, so that the thread starvation of the oracle reactions does not affect the reactions handling the console interaction.
+}
+
+object GuessGame2 extends App {
+
+  import ChymystGuessGame.{readGuess, answerMessage, delay}
+
+  // Initialize game: choose a random number `x` between 1 and 100.
+  val maxX = 100
+  val x = 1 + nextInt(maxX)
+  println(s"I have chosen a number between 1 and $maxX. Press Enter to begin.")
+
+  val canShow = m[Unit]
+  val answer = m[String]
+  val question = m[Int]
+  val canAsk = m[Unit]
+  val waitForGameOver = b[Unit, Unit]
+  val gameOver = m[String]
+
+  /*
+  The first reaction site will handle user interactions and run on a separate, non-default thread pool.
+
+  We only need at most 2 reactions to run at once in this reaction site, so we use FixedPool(2).
+  */
+  site(FixedPool(2))(
+    go { case canAsk(_) + canShow(_) ⇒ question(readGuess()); canShow(); readLine(); canAsk() },
+    go { case answer(ans) + canShow(_) ⇒ println(ans); canShow() },
+    go { case gameOver(msg) + waitForGameOver(_, r) ⇒ println(msg); r() }
+  )
+  /*
+  The second reaction site pretends to run the long computations necessary for obtaining answers.
+  It should run on the default thread pool, to maximize the CPU usage.
+  */
+  site(go { case question(guess) ⇒
+    delay()
+    val ans = answerMessage(x, guess)
+    if (guess == x) gameOver(ans) else answer(ans)
+  })
+
+  canAsk() // We now need to emit this molecule at the beginning, since we got rid of idle().
+  canShow() // This molecule is a contention token and must be emitted at the start.
+  waitForGameOver()
+  System.exit(0)
+
 }
